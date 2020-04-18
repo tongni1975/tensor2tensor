@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2019 The Tensor2Tensor Authors.
+# Copyright 2020 The Tensor2Tensor Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -31,7 +31,7 @@ from absl import logging
 import cloudpickle
 import numpy as np
 from tensor2tensor.envs import time_step
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 
 TRAJECTORY_FILE_FORMAT = r"trajectory_epoch_{epoch}_env_id_{env_id}_temperature_{temperature}_r_{r}.pkl"
 

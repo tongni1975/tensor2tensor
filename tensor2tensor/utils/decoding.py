@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2019 The Tensor2Tensor Authors.
+# Copyright 2020 The Tensor2Tensor Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -33,10 +33,11 @@ from six.moves import input  # pylint: disable=redefined-builtin
 from tensor2tensor.data_generators import problem as problem_lib
 from tensor2tensor.data_generators import text_encoder
 from tensor2tensor.data_generators import text_problems
+from tensor2tensor.utils import contrib
 from tensor2tensor.utils import hparam
 from tensor2tensor.utils import mlperf_log
 from tensor2tensor.utils import registry
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 
 FLAGS = tf.flags.FLAGS
 
@@ -96,7 +97,9 @@ def decode_hparams(overrides=""):
       # Used for MLPerf compliance logging.
       mlperf_decode_step=0.0,
       mlperf_threshold=25.0,
-      mlperf_success=False)
+      mlperf_success=False,
+      # A comma-delimited list of additional infer() outputs to be exported.
+      export_extra_infer_outputs="")
   hp.parse(overrides)
   return hp
 
@@ -453,7 +456,7 @@ def decode_from_file(estimator,
           task_id=decode_hp.multiproblem_task_id, has_input=has_input)
       gen_fn = make_input_fn_from_generator(input_gen)
       example = gen_fn()
-      return _decode_input_tensor_to_features_dict(example, hparams)
+      return _decode_input_tensor_to_features_dict(example, hparams, decode_hp)
   decodes = []
   result_iter = estimator.predict(input_fn, checkpoint_path=checkpoint_path)
 
@@ -601,7 +604,7 @@ def _decode_filename(base_filename, problem_name, decode_hp):
 def make_input_fn_from_generator(gen):
   """Use py_func to yield elements from the given generator."""
   first_ex = six.next(gen)
-  flattened = tf.contrib.framework.nest.flatten(first_ex)
+  flattened = contrib.framework().nest.flatten(first_ex)
   types = [t.dtype for t in flattened]
   shapes = [[None] * len(t.shape) for t in flattened]
   first_ex_list = [first_ex]
@@ -611,12 +614,12 @@ def make_input_fn_from_generator(gen):
       example = first_ex_list.pop()
     else:
       example = six.next(gen)
-    return tf.contrib.framework.nest.flatten(example)
+    return contrib.framework().nest.flatten(example)
 
   def input_fn():
     flat_example = tf.py_func(py_func, [], types)
     _ = [t.set_shape(shape) for t, shape in zip(flat_example, shapes)]
-    example = tf.contrib.framework.nest.pack_sequence_as(first_ex, flat_example)
+    example = contrib.framework().nest.pack_sequence_as(first_ex, flat_example)
     return example
 
   return input_fn
@@ -937,12 +940,13 @@ def _interactive_input_tensor_to_features_dict(feature_map, hparams):
   return features
 
 
-def _decode_input_tensor_to_features_dict(feature_map, hparams):
+def _decode_input_tensor_to_features_dict(feature_map, hparams, decode_hp):
   """Convert the interactive input format (see above) to a dictionary.
 
   Args:
     feature_map: dict with inputs.
     hparams: model hyperparameters
+    decode_hp: decode hyperparameters
 
   Returns:
     a features dictionary, as expected by the decoder.
@@ -962,7 +966,8 @@ def _decode_input_tensor_to_features_dict(feature_map, hparams):
   features["input_space_id"] = input_space_id
   features["target_space_id"] = target_space_id
   features["decode_length"] = (
-      IMAGE_DECODE_LENGTH if input_is_image else tf.shape(x)[1] + 50)
+      IMAGE_DECODE_LENGTH if input_is_image else
+      tf.constant(decode_hp.extra_length))
   features["inputs"] = x
   # Save inputs to "partial_targets" when prepending inputs to targets. Also
   # keep "inputs" as some models crash if they don't exist.

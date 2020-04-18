@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2019 The Tensor2Tensor Authors.
+# Copyright 2020 The Tensor2Tensor Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -24,8 +24,8 @@ from tensor2tensor.utils import hparam
 from tensor2tensor.utils import t2t_model
 from tensor2tensor.utils import test_utils
 
-import tensorflow as tf
-tf.compat.v1.enable_eager_execution()
+import tensorflow.compat.v1 as tf
+tf.enable_eager_execution()
 
 
 class T2TModelTest(tf.test.TestCase):

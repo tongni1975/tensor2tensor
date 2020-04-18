@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2019 The Tensor2Tensor Authors.
+# Copyright 2020 The Tensor2Tensor Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,10 +21,10 @@ from __future__ import print_function
 from tensor2tensor.layers import common_layers
 from tensor2tensor.utils import quantization
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 
 
-class AdafactorOptimizer(tf.compat.v1.train.Optimizer):
+class AdafactorOptimizer(tf.train.Optimizer):
   """Optimizer that implements the Adafactor algorithm.
 
   Adafactor is described in https://arxiv.org/abs/1804.04235.

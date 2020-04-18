@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2019 The Tensor2Tensor Authors.
+# Copyright 2020 The Tensor2Tensor Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -35,7 +35,7 @@ import six
 from six.moves import range  # pylint: disable=redefined-builtin
 from tensor2tensor.data_generators import tokenizer
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 
 # Reserved tokens for things like padding and EOS symbols.
 PAD = "<pad>"

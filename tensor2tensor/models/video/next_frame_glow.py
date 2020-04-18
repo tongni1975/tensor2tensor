@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2019 The Tensor2Tensor Authors.
+# Copyright 2020 The Tensor2Tensor Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,17 +20,18 @@ from __future__ import division
 from __future__ import print_function
 
 import numpy as np
+from six.moves import range
 from tensor2tensor.layers import common_layers
 from tensor2tensor.layers import common_video
 from tensor2tensor.layers import modalities
 from tensor2tensor.models.research import glow
 from tensor2tensor.models.research import glow_ops
+from tensor2tensor.utils import contrib
 from tensor2tensor.utils import registry
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 import tensorflow_probability as tfp
 
-
-arg_scope = tf.contrib.framework.arg_scope
+arg_scope = contrib.framework().arg_scope
 
 
 @registry.register_hparams

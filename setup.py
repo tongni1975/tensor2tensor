@@ -5,7 +5,7 @@ from setuptools import setup
 
 setup(
     name='tensor2tensor',
-    version='1.15.2',
+    version='1.15.5',
     description='Tensor2Tensor',
     long_description=(
         'Tensor2Tensor, or T2T for short, is a library of '
@@ -50,7 +50,7 @@ setup(
         'gin-config',
         'google-api-python-client',
         'gunicorn',
-        'gym',
+        'gym==0.14.0',
         'h5py',
         'kfac',
         'mesh-tensorflow',
@@ -61,7 +61,7 @@ setup(
         'pypng',
         'requests',
         'scipy',
-        'six',
+        'six>=1.12.0',
         'sympy',
         'tensorflow-datasets',
         'tensorflow-gan',
@@ -69,7 +69,7 @@ setup(
         'tqdm',
     ],
     extras_require={
-        'tensorflow': ['tensorflow>=1.15.0'],
+        'tensorflow': ['tensorflow>=1.15.0,<2.0'],
         'tensorflow-hub': ['tensorflow-hub>=0.1.1'],
         'tests': [
             # Needed to fix a Travis pytest error.

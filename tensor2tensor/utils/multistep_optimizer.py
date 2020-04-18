@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2019 The Tensor2Tensor Authors.
+# Copyright 2020 The Tensor2Tensor Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -26,10 +26,10 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 
 
-class MultistepAdamOptimizer(tf.compat.v1.train.AdamOptimizer):
+class MultistepAdamOptimizer(tf.train.AdamOptimizer):
   """Adam with SGD updates every n steps with accumulated gradients."""
 
   def __init__(self, learning_rate=0.001, beta1=0.9, beta2=0.999, epsilon=1e-8,

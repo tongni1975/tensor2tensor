@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2019 The Tensor2Tensor Authors.
+# Copyright 2020 The Tensor2Tensor Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -30,12 +30,12 @@ from tensor2tensor.data_generators import text_encoder
 from tensor2tensor.layers import common_hparams
 from tensor2tensor.utils import registry
 from tensor2tensor.utils import usr_dir as usr_dir_lib
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 
 FLAGS = tf.flags.FLAGS
 
 CONSOLE_URL = "https://console.cloud.google.com/mlengine/jobs/"
-RUNTIME_VERSION = "1.13"
+RUNTIME_VERSION = "1.14"
 LIST_VM = "gcloud compute instances list"
 DEFAULT_PROJECT = "gcloud config get-value project"
 DEFAULT_REGION = "gcloud config get-value compute/region"
@@ -310,12 +310,15 @@ def validate_flags():
     if FLAGS.worker_gpu:
       if FLAGS.worker_gpu == 1:
         assert FLAGS.cloud_mlengine_master_type in ["standard_gpu",
-                                                    "standard_p100"]
+                                                    "standard_p100",
+                                                    "standard_v100"]
       elif FLAGS.worker_gpu == 4:
         assert FLAGS.cloud_mlengine_master_type in ["complex_model_m_gpu",
-                                                    "complex_model_m_p100"]
+                                                    "complex_model_m_p100",
+                                                    "complex_model_m_v100"]
       else:
-        assert FLAGS.cloud_mlengine_master_type == "complex_model_l_gpu"
+        assert FLAGS.cloud_mlengine_master_type in ["complex_model_l_gpu",
+                                                    "complex_model_l_v100"]
     else:
       assert FLAGS.cloud_mlengine_master_type in ["standard", "large_model",
                                                   "complex_model_s",

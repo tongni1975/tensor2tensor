@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2019 The Tensor2Tensor Authors.
+# Copyright 2020 The Tensor2Tensor Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -27,7 +27,8 @@ from absl import logging
 import numpy as np
 from six.moves import range  # pylint: disable=redefined-builtin
 
-import tensorflow as tf
+from tensor2tensor.utils import contrib
+import tensorflow.compat.v1 as tf
 import tensorflow_probability as tfp
 
 from tensorflow.python.framework import function
@@ -2742,7 +2743,7 @@ def _fn_with_custom_grad(fn, inputs, grad_fn, use_global_vars=False):
   Returns:
     fn(*inputs)
   """
-  vs = tf.compat.v1.get_variable_scope()
+  vs = tf.get_variable_scope()
   get_vars_fn = (
       vs.global_variables if use_global_vars else vs.trainable_variables)
   len_before_vars = len(get_vars_fn())
@@ -2761,7 +2762,7 @@ def _fn_with_custom_grad(fn, inputs, grad_fn, use_global_vars=False):
 
   def custom_grad_fn(op, *dys):
     """Custom grad fn applying grad_fn for identity Defun."""
-    fn_inputs, fn_vars, fn_outputs = tf.contrib.framework.nest.pack_sequence_as(
+    fn_inputs, fn_vars, fn_outputs = contrib.framework().nest.pack_sequence_as(
         defun_inputs, list(op.inputs))
     dys = list(dys)
     assert len(fn_outputs) == len(outputs)
@@ -2785,10 +2786,10 @@ def _fn_with_custom_grad(fn, inputs, grad_fn, use_global_vars=False):
       python_grad_func=custom_grad_fn,
       shape_func=lambda _: [t.get_shape() for t in outputs])
   def identity(*args):
-    _, _, outs = tf.contrib.framework.nest.pack_sequence_as(defun_inputs, args)
+    _, _, outs = contrib.framework().nest.pack_sequence_as(defun_inputs, args)
     return tuple([tf.identity(t) for t in outs])
 
-  flat_inputs = tf.contrib.framework.nest.flatten(defun_inputs)
+  flat_inputs = contrib.framework().nest.flatten(defun_inputs)
   id_out = identity(*flat_inputs)
   return id_out
 
@@ -2948,7 +2949,7 @@ def sample_with_temperature(logits, temperature, sampling_keep_top_k=-1):
     argmax = tf.argmax(tf.reshape(logits, [-1, logits_shape[-1]]), axis=1)
     return tf.reshape(argmax, logits_shape[:-1])
   else:
-    assert temperature > 0.0
+    tf.debugging.assert_greater(temperature, 0.0)
 
     if sampling_keep_top_k != -1:
       if sampling_keep_top_k <= 0:
@@ -2956,7 +2957,7 @@ def sample_with_temperature(logits, temperature, sampling_keep_top_k=-1):
 
       vocab_size = shape_list(logits)[1]
 
-      k_largest = tf.contrib.nn.nth_element(
+      k_largest = contrib.nn().nth_element(
           logits, n=sampling_keep_top_k, reverse=True)
       k_largest = tf.tile(tf.reshape(k_largest, [-1, 1]), [1, vocab_size])
 
@@ -2971,6 +2972,81 @@ def sample_with_temperature(logits, temperature, sampling_keep_top_k=-1):
     choices = tf.reshape(choices,
                          shape_list(logits)[:logits.get_shape().ndims - 1])
     return choices
+
+
+def _to_nd_indices(indices):
+  """Returns indices used for tf.gather_nd or tf.scatter_nd.
+
+  Args:
+    indices: A `Tensor` of shape [batch_size, size] with integer values. The
+      values are the indices of another `Tensor`. For example, `indices` is the
+      output of tf.argsort or tf.math.top_k.
+
+  Returns:
+    A `Tensor` with shape [batch_size, size, 2] that can be used by tf.gather_nd
+    or tf.scatter_nd.
+
+  """
+  indices.get_shape().assert_has_rank(2)
+  batch_ids = tf.ones_like(indices) * tf.expand_dims(
+      tf.range(tf.shape(input=indices)[0]), 1)
+  return tf.stack([batch_ids, indices], axis=-1)
+
+
+def _select_top_k(logits, top_k):
+  """Replaces logits, expect the top k highest values, with small number (-1e6).
+
+  If k is -1 don't replace anything.
+
+  Args:
+    logits: A `Tensor` of shape [batch_size, ..., vocab_size]
+    top_k: vector of batch size.
+
+  Returns:
+    A `Tensor` with same shape  as logits.
+  """
+  vocab_size = logits.shape[-1]
+  flat_logits = tf.reshape(logits, [-1, vocab_size])
+  top_k = tf.where(
+      tf.not_equal(top_k, -1), top_k,
+      tf.ones_like(top_k) * vocab_size)
+  values, idx = tf.math.top_k(flat_logits, k=vocab_size, sorted=False)
+  nd_idx = _to_nd_indices(idx)
+
+  mask_idx = tf.reshape(
+      tf.range(vocab_size), [1] * (len(logits.shape) - 1) + [-1])
+  for i, size in enumerate(logits.shape[:-1]):
+    mask_idx = tf.repeat(mask_idx, size, axis=i)
+  mask = tf.reshape(
+      mask_idx < tf.reshape(top_k, [-1] + [1] * (len(logits.shape) - 1)), [-1])
+
+  topk_logits = tf.tensor_scatter_nd_update(
+      tf.ones_like(flat_logits) * -1e6,
+      tf.reshape(nd_idx, [-1, 2])[mask],
+      tf.reshape(values, [-1])[mask])
+
+  return tf.reshape(topk_logits, logits.shape)
+
+
+def sample_temperature_per_example(logits, temperature, sampling_keep_top_k=-1):
+  """Either random sampling with different temperature per example.
+
+  Args:
+    logits: a Tensor.
+    temperature: a float vector of same size as logits.
+    sampling_keep_top_k: If not -1, only sample from the top k logits.
+  Returns:
+    a Tensor with one fewer dimension than logits.
+  """
+  if sampling_keep_top_k != -1:
+    logits = _select_top_k(logits, sampling_keep_top_k)
+
+  logits /= tf.reshape(temperature, [-1] + [1] * (len(logits.shape) - 1))
+  reshaped_logits = tf.reshape(logits, [-1, shape_list(logits)[-1]])
+  choices = tf.multinomial(reshaped_logits, 1)
+  choices = tf.reshape(choices,
+                       shape_list(logits)[:logits.get_shape().ndims - 1])
+  return choices
 
 
 def ones_matrix_band_part(rows, cols, num_lower, num_upper, out_shape=None):
@@ -3050,7 +3126,7 @@ def _recompute_grad(fn, args):
     variables = [underlying_variable_ref(v) for v in variables]
     # Recompute outputs
     with tf.control_dependencies(output_grads):
-      with tf.contrib.framework.arg_scope(cached_arg_scope[0]):
+      with contrib.framework().arg_scope(cached_arg_scope[0]):
         with tf.variable_scope(cached_vs[0], reuse=True):
           outputs = fn(*inputs)
 
@@ -3069,8 +3145,8 @@ def _recompute_grad(fn, args):
 
   @fn_with_custom_grad(grad_fn)
   def fn_with_recompute(*args):
-    cached_vs.append(tf.compat.v1.get_variable_scope())
-    cached_arg_scope.append(tf.contrib.framework.current_arg_scope())
+    cached_vs.append(tf.get_variable_scope())
+    cached_arg_scope.append(contrib.framework().current_arg_scope())
     return fn(*args)
 
   return fn_with_recompute(*args)
@@ -3084,7 +3160,7 @@ def dense(x, units, **kwargs):
     # We need to find the layer parameters using scope name for the layer, so
     # check that the layer is named. Otherwise parameters for different layers
     # may get mixed up.
-    layer_name = tf.compat.v1.get_variable_scope().name
+    layer_name = tf.get_variable_scope().name
     if (not layer_name) or ("name" not in kwargs):
       raise ValueError(
           "Variable scope and layer name cannot be empty. Actual: "
@@ -3411,11 +3487,11 @@ def should_generate_summaries():
   Returns:
     a boolean
   """
-  name_scope = tf.contrib.framework.get_name_scope()
+  name_scope = contrib.framework().get_name_scope()
   if name_scope and "while/" in name_scope:
     # Summaries don't work well within tf.while_loop()
     return False
-  if tf.compat.v1.get_variable_scope().reuse:
+  if tf.get_variable_scope().reuse:
     # Avoid generating separate summaries for different data shards
     return False
   return True
@@ -3826,7 +3902,7 @@ def weight_targeting(w, k):
   w = tf.reshape(w, [size, w_shape[-1]])
 
   transpose_w = tf.transpose(w)
-  thres = tf.contrib.framework.sort(tf.abs(transpose_w), axis=1)[:, k]
+  thres = contrib.framework().sort(tf.abs(transpose_w), axis=1)[:, k]
   mask = to_float(thres[None, :] >= tf.abs(w))
 
   return tf.reshape(mask, w_shape)
@@ -3840,7 +3916,7 @@ def unit_targeting(w, k):
   w = tf.reshape(w, [size, w_shape[-1]])
 
   norm = tf.norm(w, axis=0)
-  thres = tf.contrib.framework.sort(norm, axis=0)[k]
+  thres = contrib.framework().sort(norm, axis=0)[k]
   mask = to_float(thres >= norm)[None, :]
   mask = tf.tile(mask, [size, 1])
 

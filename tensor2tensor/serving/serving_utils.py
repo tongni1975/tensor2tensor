@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2019 The Tensor2Tensor Authors.
+# Copyright 2020 The Tensor2Tensor Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -28,7 +28,9 @@ import numpy as np
 from tensor2tensor import problems as problems_lib  # pylint: disable=unused-import
 from tensor2tensor.data_generators import text_encoder
 from tensor2tensor.utils import cloud_mlengine as cloud
-import tensorflow as tf
+from tensor2tensor.utils import contrib
+import tensorflow.compat.v1 as tf
+
 from tensorflow_serving.apis import predict_pb2
 from tensorflow_serving.apis import prediction_service_pb2_grpc
 

@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2019 The Tensor2Tensor Authors.
+# Copyright 2020 The Tensor2Tensor Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -26,7 +26,7 @@ from tensor2tensor.layers import common_layers
 from tensor2tensor.layers import transformer_layers
 from tensor2tensor.utils import beam_search
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 import tensorflow_probability as tfp
 
 DO_SUMMARIES = True

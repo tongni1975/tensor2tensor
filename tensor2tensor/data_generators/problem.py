@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2019 The Tensor2Tensor Authors.
+# Copyright 2020 The Tensor2Tensor Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -26,12 +26,13 @@ import six
 
 from tensor2tensor.data_generators import generator_utils
 from tensor2tensor.data_generators import text_encoder
+from tensor2tensor.utils import contrib
 from tensor2tensor.utils import data_reader
 from tensor2tensor.utils import hparam
 from tensor2tensor.utils import metrics
 from tensor2tensor.utils import mlperf_log
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 # pylint: disable=g-import-not-at-top
 try:
   from tensorflow.contrib.tpu.python.tpu import tpu_config
@@ -648,8 +649,8 @@ class Problem(object):
 
     data_filepattern = self.filepattern(data_dir, dataset_split, shard=shard)
     tf.logging.info("Reading data files from %s", data_filepattern)
-    data_files = sorted(tf.contrib.slim.parallel_reader.get_data_files(
-        data_filepattern))
+    data_files = sorted(
+        contrib.slim().parallel_reader.get_data_files(data_filepattern))
 
     # Functions used in dataset transforms below. `filenames` can be either a
     # `tf.string` tensor or `tf.data.Dataset` containing one or more filenames.
@@ -709,13 +710,20 @@ class Problem(object):
     # Necessary to rejoin examples in the correct order with the Cloud ML Engine
     # batch prediction API.
     data_fields["batch_prediction_key"] = tf.FixedLenFeature([1], tf.int64, 0)
+
+    if getattr(self._hparams, "sampling_method", "") == "random_per_example":
+      data_fields["sampling_temp"] = tf.FixedLenFeature(
+          [1], tf.float32, getattr(self._hparams, "sampling_temp", 1.0))
+      data_fields["sampling_keep_top_k"] = tf.FixedLenFeature(
+          [1], tf.int64, getattr(self._hparams, "sampling_keep_top_k", -1))
+
     if data_items_to_decoders is None:
       data_items_to_decoders = {
-          field: tf.contrib.slim.tfexample_decoder.Tensor(field)
+          field: contrib.slim().tfexample_decoder.Tensor(field)
           for field in data_fields
       }
 
-    decoder = tf.contrib.slim.tfexample_decoder.TFExampleDecoder(
+    decoder = contrib.slim().tfexample_decoder.TFExampleDecoder(
         data_fields, data_items_to_decoders)
 
     decode_items = list(sorted(data_items_to_decoders))
@@ -904,6 +912,7 @@ class Problem(object):
 
   def serving_input_fn(self, hparams, decode_hparams=None, use_tpu=False):
     """Input fn for serving export, starting from serialized example."""
+    self._hparams = hparams
     mode = tf.estimator.ModeKeys.PREDICT
     serialized_example = tf.placeholder(
         dtype=tf.string, shape=[None], name="serialized_example")

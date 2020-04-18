@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2019 The Tensor2Tensor Authors.
+# Copyright 2020 The Tensor2Tensor Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -41,7 +41,7 @@ from tensor2tensor.utils import mlperf_log
 from tensor2tensor.utils import registry
 from tensor2tensor.utils import t2t_model
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 
 # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.ops import inplace_ops
@@ -503,6 +503,10 @@ class Transformer(t2t_model.T2TModel):
     if hparams.pos == "timing":
       positional_encoding = common_attention.get_timing_signal_1d(
           decode_length + 1, hparams.hidden_size)
+    elif hparams.pos == "timing_from_features":
+      positional_encoding = common_attention.add_timing_signals_from_features(
+          tf.zeros([1, decode_length + 1, hparams.hidden_size]), features,
+          hparams.position_features)
     elif hparams.pos == "emb":
       positional_encoding = common_attention.add_positional_embedding(
           tf.zeros([1, decode_length + 1, hparams.hidden_size]),
@@ -619,6 +623,11 @@ class Transformer(t2t_model.T2TModel):
       return ret, cache
 
     eos_id = self.get_decode_end_id() or beam_search.EOS_ID
+    temperature = features.get("sampling_temp",
+                               getattr(hparams, "sampling_temp", 0.0))
+    top_k = features.get("sampling_keep_top_k",
+                         getattr(hparams, "sampling_keep_top_k", -1))
+
     ret = fast_decode_tpu(
         encoder_output=encoder_output,
         encoder_decoder_attention_bias=encoder_decoder_attention_bias,
@@ -632,7 +641,9 @@ class Transformer(t2t_model.T2TModel):
         alpha=alpha,
         batch_size=batch_size,
         force_decode_length=self._decode_hparams.force_decode_length,
-        eos_id=eos_id)
+        eos_id=eos_id,
+        sampling_temperature=temperature,
+        top_k=top_k)
     if partial_targets is not None:
       if beam_size <= 1 or top_beams <= 1:
         ret["outputs"] = ret["outputs"][:, partial_targets_length:]
@@ -664,7 +675,8 @@ class Transformer(t2t_model.T2TModel):
                    decode_length,
                    beam_size=1,
                    top_beams=1,
-                   alpha=1.0):
+                   alpha=1.0,
+                   preprocess_targets_method=None):
     """Fast decoding.
 
     Implements both greedy and beam search decoding, uses beam search iff
@@ -677,6 +689,8 @@ class Transformer(t2t_model.T2TModel):
       top_beams: an integer. How many of the beams to return.
       alpha: Float that controls the length penalty. larger the alpha, stronger
         the preference for longer translations.
+      preprocess_targets_method: method used to preprocess targets. If None,
+      uses method "preprocess_targets" defined inside this method.
 
     Returns:
       A dict of decoding results {
@@ -748,6 +762,10 @@ class Transformer(t2t_model.T2TModel):
     if hparams.pos == "timing":
       positional_encoding = common_attention.get_timing_signal_1d(
           decode_length + 1, hparams.hidden_size)
+    elif hparams.pos == "timing_from_features":
+      positional_encoding = common_attention.add_timing_signals_from_features(
+          tf.zeros([1, decode_length, hparams.hidden_size]), features,
+          hparams.position_features)
     elif hparams.pos == "emb":
       positional_encoding = common_attention.add_positional_embedding(
           tf.zeros([1, decode_length, hparams.hidden_size]), hparams.max_length,
@@ -827,12 +845,14 @@ class Transformer(t2t_model.T2TModel):
               [cache["attention_history"][layer_nbr],
                self.attention_weights[k]],
               axis=2)
+    if not preprocess_targets_method:
+      preprocess_targets_method = preprocess_targets
 
     def symbols_to_logits_fn(ids, i, cache):
       """Go from ids to logits for next symbol."""
       ids = ids[:, -1:]
       targets = tf.expand_dims(tf.expand_dims(ids, axis=2), axis=3)
-      targets = preprocess_targets(targets, i)
+      targets = preprocess_targets_method(targets, i)
 
       bias = decoder_self_attention_bias[:, :, i:i + 1, :i + 1]
       with tf.variable_scope("body"):
@@ -875,6 +895,10 @@ class Transformer(t2t_model.T2TModel):
 
     sos_id = self.get_decode_start_id() or 0
     eos_id = self.get_decode_end_id() or beam_search.EOS_ID
+    temperature = features.get("sampling_temp",
+                               getattr(hparams, "sampling_temp", 0.0))
+    top_k = features.get("sampling_keep_top_k",
+                         getattr(hparams, "sampling_keep_top_k", -1))
 
     ret = fast_decode(
         encoder_output=encoder_output,
@@ -891,6 +915,8 @@ class Transformer(t2t_model.T2TModel):
         force_decode_length=self._decode_hparams.force_decode_length,
         sos_id=sos_id,
         eos_id=eos_id,
+        sampling_temperature=temperature,
+        top_k=top_k,
         cache=att_cache)
     if partial_targets is not None:
       if beam_size <= 1 or top_beams <= 1:
@@ -978,7 +1004,9 @@ def fast_decode_tpu(encoder_output,
                     batch_size=None,
                     force_decode_length=False,
                     scope_prefix="body/",
-                    use_top_k_with_unique=True):
+                    use_top_k_with_unique=True,
+                    sampling_temperature=0.0,
+                    top_k=-1):
   """Given encoder output and a symbols to logits function, does fast decoding.
 
   Implements both greedy and beam search decoding for TPU, uses beam search iff
@@ -1006,6 +1034,8 @@ def fast_decode_tpu(encoder_output,
     scope_prefix: str, prefix for decoder layer variable scopes.
     use_top_k_with_unique: bool, whether to use a fast (but decreased precision)
       top_k during beam search.
+    sampling_temperature: scalar, temperature with which to sample.
+    top_k: scalar, sample only top k.
 
   Returns:
     A dict of decoding results {
@@ -1063,12 +1093,15 @@ def fast_decode_tpu(encoder_output,
       """One step of greedy decoding."""
       logits, cache = symbols_to_logits_fn(next_id, i, cache)
       log_probs = common_layers.log_prob_from_logits(logits)
-      temperature = getattr(hparams, "sampling_temp", 0.0)
-      keep_top = getattr(hparams, "sampling_keep_top_k", -1)
-      if hparams.sampling_method == "argmax":
-        temperature = 0.0
-      next_id = common_layers.sample_with_temperature(
-          logits, temperature, keep_top)
+      temperature = sampling_temperature
+      if hparams.sampling_method == "random_per_example":
+        next_id = common_layers.sample_temperature_per_example(
+            logits, temperature, top_k)
+      else:
+        if hparams.sampling_method == "argmax":
+          temperature = 0.0
+        next_id = common_layers.sample_with_temperature(logits, temperature,
+                                                        top_k)
 
       log_prob_indices = tf.stack([tf.range(tf.to_int64(batch_size)), next_id],
                                   axis=1)
@@ -1134,6 +1167,8 @@ def fast_decode(encoder_output,
                 batch_size=None,
                 force_decode_length=False,
                 scope_prefix="body/",
+                sampling_temperature=0.0,
+                top_k=-1,
                 cache=None):
   """Given encoder output and a symbols to logits function, does fast decoding.
 
@@ -1160,6 +1195,8 @@ def fast_decode(encoder_output,
     force_decode_length: bool, whether to force the full decode length, or if
       False, stop when all beams hit eos_id.
     scope_prefix: str, prefix for decoder layer variable scopes.
+    sampling_temperature: scalar, temperature with which to sample.
+    top_k: scalar, sample only top k.
     cache: cache dictionary for additional predictions.
 
   Returns:
@@ -1208,12 +1245,15 @@ def fast_decode(encoder_output,
       """One step of greedy decoding."""
       logits, cache = symbols_to_logits_fn(next_id, i, cache)
       log_probs = common_layers.log_prob_from_logits(logits)
-      temperature = getattr(hparams, "sampling_temp", 0.0)
-      keep_top = getattr(hparams, "sampling_keep_top_k", -1)
-      if hparams.sampling_method == "argmax":
-        temperature = 0.0
-      next_id = common_layers.sample_with_temperature(
-          logits, temperature, keep_top)
+      temperature = sampling_temperature
+      if hparams.sampling_method == "random_per_example":
+        next_id = common_layers.sample_temperature_per_example(
+            logits, temperature, top_k)
+      else:
+        if hparams.sampling_method == "argmax":
+          temperature = 0.0
+        next_id = common_layers.sample_with_temperature(logits, temperature,
+                                                        top_k)
 
       log_prob_indices = tf.stack([tf.range(tf.to_int64(batch_size)), next_id],
                                   axis=1)
@@ -1402,6 +1442,9 @@ def transformer_prepare_decoder(targets, hparams, features=None, pad=None):
           decoder_input, targets_position)
     else:
       decoder_input = common_attention.add_timing_signal_1d(decoder_input)
+  elif hparams.pos == "timing_from_features":
+    decoder_input = common_attention.add_timing_signals_from_features(
+        decoder_input, features, hparams.position_features)
   elif hparams.pos == "emb":
     decoder_input = common_attention.add_positional_embedding(
         decoder_input, hparams.max_length, "targets_positional_embedding",
@@ -1768,6 +1811,7 @@ def transformer_base_v1():
   hparams.add_hparam("relu_dropout", 0.0)
   hparams.add_hparam("relu_dropout_broadcast_dims", "")
   hparams.add_hparam("pos", "timing")  # timing, none
+  hparams.add_hparam("position_features", "")
   hparams.add_hparam("nbr_decoder_problems", 1)
   hparams.add_hparam("proximity_bias", False)
   hparams.add_hparam("causal_decoder_self_attention", True)

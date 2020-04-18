@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2019 The Tensor2Tensor Authors.
+# Copyright 2020 The Tensor2Tensor Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -30,7 +30,7 @@ import subprocess
 from tensor2tensor.data_generators import generator_utils
 from tensor2tensor.data_generators import text_encoder
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 
 
 def include_revision(revision_num, skip_factor=1.1):

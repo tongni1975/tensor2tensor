@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2019 The Tensor2Tensor Authors.
+# Copyright 2020 The Tensor2Tensor Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -23,8 +23,9 @@ import numpy as np
 
 from tensor2tensor.layers import modalities
 from tensor2tensor.models.research import neural_stack
+from tensor2tensor.utils import contrib
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 
 
 def build_fake_controller(cell):
@@ -399,7 +400,7 @@ class NeuralStackModelTest(tf.test.TestCase):
     vocab_size = 128
 
     hparams = neural_stack.neural_stack()
-    problem_hparams = tf.contrib.training.HParams()
+    problem_hparams = contrib.training().HParams()
 
     problem_hparams.add_hparam("modality", {
         "inputs": modalities.ModalityType.SYMBOL,

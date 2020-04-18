@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2019 The Tensor2Tensor Authors.
+# Copyright 2020 The Tensor2Tensor Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,7 +12,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 
 """Creates a RevNet with the bottleneck residual function.
 
@@ -37,10 +36,11 @@ https://arxiv.org/pdf/1707.04585.pdf
 
 import functools
 from tensor2tensor.layers import common_hparams
+from tensor2tensor.utils import contrib
 from tensor2tensor.utils import registry
 from tensor2tensor.utils import t2t_model
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 
 
 def wrapped_partial(fn, *args, **kwargs):
@@ -251,10 +251,8 @@ def unit(x1, x2, block_num, depth, num_layers, dim='2d',
 
     # Full block using memory-efficient rev_block implementation.
     with tf.variable_scope('full_block'):
-      x1, x2 = tf.contrib.layers.rev_block(x1, x2,
-                                           residual,
-                                           residual,
-                                           num_layers=num_layers)
+      x1, x2 = contrib.layers().rev_block(
+          x1, x2, residual, residual, num_layers=num_layers)
       return x1, x2
 
 

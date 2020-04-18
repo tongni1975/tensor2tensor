@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2019 The Tensor2Tensor Authors.
+# Copyright 2020 The Tensor2Tensor Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -23,7 +23,7 @@ from tensor2tensor.bin import t2t_trainer          # pylint: disable=unused-impo
 from tensor2tensor.data_generators import problem  # pylint: disable=unused-import
 from tensor2tensor.utils import trainer_lib
 from tensor2tensor.utils import usr_dir
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 
 flags = tf.flags
 FLAGS = flags.FLAGS

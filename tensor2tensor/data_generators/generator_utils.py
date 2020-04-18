@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2019 The Tensor2Tensor Authors.
+# Copyright 2020 The Tensor2Tensor Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -38,7 +38,7 @@ import six.moves.urllib_request as urllib
 from tensor2tensor.data_generators import text_encoder
 from tensor2tensor.utils import mlperf_log
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 
 UNSHUFFLED_SUFFIX = "-unshuffled"
 
@@ -867,18 +867,18 @@ class SequenceDatasetPacker(object):
 
   def _standardize(self, dataset, keys):
     """Force dataset structure into a tuple of Tensors."""
-    shapes = tf.compat.v1.data.get_output_shapes(dataset)
+    shapes = tf.data.get_output_shapes(dataset)
 
     if isinstance(shapes, dict):
       keys = keys or tuple(shapes.keys())
       dataset = dataset.map(lambda x: tuple(x[k] for k in keys))
-      shapes = tf.compat.v1.data.get_output_shapes(dataset)
+      shapes = tf.data.get_output_shapes(dataset)
 
     if not all(isinstance(i, tf.TensorShape) for i in shapes):
       # Internally this class expects tuples of Tensors, even for the degenerate
       # case of a single sequence.
       dataset = dataset.map(lambda x: (x,))
-      shapes = tf.compat.v1.data.get_output_shapes(dataset)
+      shapes = tf.data.get_output_shapes(dataset)
 
     for s in shapes:
       if not s.is_compatible_with(tf.TensorShape([None])):
@@ -890,7 +890,7 @@ class SequenceDatasetPacker(object):
     if self._chop_long_sequences and len(shapes) != 1:
       raise ValueError("chop_long_sequences expects a single sequence dataset.")
 
-    token_types = tf.compat.v1.data.get_output_types(dataset)
+    token_types = tf.data.get_output_types(dataset)
     if len(set(token_types)) > 1:
       raise ValueError("Inconsistent dtypes: {}".format(token_types))
 

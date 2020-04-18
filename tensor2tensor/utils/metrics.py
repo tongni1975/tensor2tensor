@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2019 The Tensor2Tensor Authors.
+# Copyright 2020 The Tensor2Tensor Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -24,11 +24,11 @@ import six
 from tensor2tensor.layers import common_layers
 from tensor2tensor.layers import modalities
 from tensor2tensor.utils import bleu_hook
+from tensor2tensor.utils import contrib
 from tensor2tensor.utils import rouge
 from tensor2tensor.utils import sari_hook
 
-import tensorflow as tf
-
+import tensorflow.compat.v1 as tf
 from tensorflow.python.util import tf_inspect as inspect
 
 
@@ -199,16 +199,13 @@ def two_class_log_likelihood(predictions, labels, weights_fn=None):
     A pair, with the average log likelihood in the first component.
   """
   del weights_fn
-  float_labels = tf.cast(labels, dtype=tf.float64)
   float_predictions = tf.cast(tf.squeeze(predictions), dtype=tf.float64)
-  # likelihood should be just p for class 1, and 1 - p for class 0.
-  # signs is 1 for class 1, and -1 for class 0
-  signs = 2 * float_labels - tf.ones_like(float_labels)
-  # constant_term is 1 for class 0, and 0 for class 1.
-  constant_term = tf.ones_like(float_labels) - float_labels
-  likelihoods = constant_term + signs * float_predictions
-  log_likelihoods = tf.log(likelihoods)
-  avg_log_likelihood = tf.reduce_mean(log_likelihoods)
+  batch_probs = tf.stack([1. - float_predictions, float_predictions], axis=-1)
+  int_labels = tf.cast(tf.squeeze(labels), dtype=tf.int32)
+  onehot_targets = tf.cast(tf.one_hot(int_labels, 2), dtype=tf.float64)
+  chosen_probs = tf.einsum(
+      "ij,ij->i", batch_probs, onehot_targets, name="chosen_probs")
+  avg_log_likelihood = tf.reduce_mean(tf.log(chosen_probs))
   return avg_log_likelihood, tf.constant(1.0)
 
 
@@ -880,8 +877,8 @@ def pearson_correlation_coefficient(predictions, labels, weights_fn=None):
     The pearson correlation coefficient.
   """
   del weights_fn
-  _, pearson = tf.contrib.metrics.streaming_pearson_correlation(predictions,
-                                                                labels)
+  _, pearson = contrib.metrics().streaming_pearson_correlation(
+      predictions, labels)
   return pearson, tf.constant(1.0)
 
 # Metrics are functions that take predictions and labels and return

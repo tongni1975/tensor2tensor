@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2019 The Tensor2Tensor Authors.
+# Copyright 2020 The Tensor2Tensor Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -39,7 +39,7 @@ from __future__ import print_function
 import collections
 
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 
 # The paper that intoduces the SARI score uses only the precision of the deleted
 # tokens (i.e. beta=0). To give more emphasis on recall, you may set, e.g.,

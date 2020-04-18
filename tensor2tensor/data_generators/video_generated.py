@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2019 The Tensor2Tensor Authors.
+# Copyright 2020 The Tensor2Tensor Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -25,9 +25,10 @@ import numpy as np
 
 from tensor2tensor.data_generators import video_utils
 from tensor2tensor.layers import modalities
+from tensor2tensor.utils import contrib
 from tensor2tensor.utils import registry
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 
 try:
   import matplotlib  # pylint: disable=g-import-not-at-top
@@ -85,8 +86,8 @@ class VideoStochasticShapes10k(video_utils.VideoProblem):
         "frame_number": tf.FixedLenFeature([1], tf.int64),
     }
     decoders = {
-        "frame_number": tf.contrib.slim.tfexample_decoder.Tensor(
-            tensor_key="frame_number"),
+        "frame_number":
+            contrib.slim().tfexample_decoder.Tensor(tensor_key="frame_number"),
     }
     return data_fields, decoders
 

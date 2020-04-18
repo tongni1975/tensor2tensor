@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2019 The Tensor2Tensor Authors.
+# Copyright 2020 The Tensor2Tensor Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -32,7 +32,8 @@ from tensor2tensor.data_generators import problem
 from tensor2tensor.envs import gym_spaces_utils
 from tensor2tensor.envs import trajectory
 from tensor2tensor.layers import modalities
-import tensorflow as tf
+from tensor2tensor.utils import contrib
+import tensorflow.compat.v1 as tf
 
 # Names for data fields in stored tf.Examples.
 TIMESTEP_FIELD = "timestep"
@@ -476,7 +477,7 @@ class EnvProblem(Env, problem.Problem):
     }
 
     data_items_to_decoders = {
-        field: tf.contrib.slim.tfexample_decoder.Tensor(field)
+        field: contrib.slim().tfexample_decoder.Tensor(field)
         for field in data_fields
     }
 

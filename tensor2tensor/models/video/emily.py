@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2019 The Tensor2Tensor Authors.
+# Copyright 2020 The Tensor2Tensor Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -32,12 +32,13 @@ from tensor2tensor.layers import common_layers
 from tensor2tensor.layers import common_video
 from tensor2tensor.models.video import sv2p
 from tensor2tensor.models.video import sv2p_params
+from tensor2tensor.utils import contrib
 from tensor2tensor.utils import registry
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 
 tfl = tf.layers
-tfcl = tf.contrib.layers
+tfcl = contrib.layers()
 
 
 @registry.register_model

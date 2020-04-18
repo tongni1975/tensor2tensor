@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2019 The Tensor2Tensor Authors.
+# Copyright 2020 The Tensor2Tensor Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -31,11 +31,12 @@ from tensor2tensor.data_generators import problem
 from tensor2tensor.data_generators import video_utils
 from tensor2tensor.layers import modalities
 from tensor2tensor.rl import gym_utils
+from tensor2tensor.utils import contrib
 from tensor2tensor.utils import metrics
 from tensor2tensor.utils import misc_utils
 from tensor2tensor.utils import registry
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 
 
 Frame = collections.namedtuple(
@@ -377,7 +378,7 @@ class T2TEnv(EnvSimulationProblem):
         name: tf.FixedLenFeature([1], tf.int64) for name in field_names
     }
     decoders = {
-        name: tf.contrib.slim.tfexample_decoder.Tensor(tensor_key=name)
+        name: contrib.slim().tfexample_decoder.Tensor(tensor_key=name)
         for name in field_names
     }
     return (data_fields, decoders)

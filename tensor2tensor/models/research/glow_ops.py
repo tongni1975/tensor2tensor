@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2019 The Tensor2Tensor Authors.
+# Copyright 2020 The Tensor2Tensor Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -24,11 +24,12 @@ import numpy as np
 import scipy
 from tensor2tensor.layers import common_layers
 from tensor2tensor.layers import common_video
-import tensorflow as tf
+from tensor2tensor.utils import contrib
+import tensorflow.compat.v1 as tf
 import tensorflow_probability as tfp
 
-arg_scope = tf.contrib.framework.arg_scope
-add_arg_scope = tf.contrib.framework.add_arg_scope
+arg_scope = contrib.framework().arg_scope
+add_arg_scope = contrib.framework().add_arg_scope
 
 
 def linear_interpolate(tensor1, tensor2, coeffs):

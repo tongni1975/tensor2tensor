@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2019 The Tensor2Tensor Authors.
+# Copyright 2020 The Tensor2Tensor Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -32,7 +32,7 @@ from six.moves import zip  # pylint: disable=redefined-builtin
 from tensor2tensor.layers import common_layers
 from tensor2tensor.layers.vq_discrete import DiscreteBottleneck
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 
 DEFAULT_DEV_STRING = "existing_device"
 
@@ -65,7 +65,7 @@ def add_scope(scope=None, scope_fn=None):
 
 
 def add_var_scope(scope=None):
-  return add_scope(scope, scope_fn=tf.compat.v1.variable_scope)
+  return add_scope(scope, scope_fn=tf.variable_scope)
 
 
 def add_name_scope(scope=None):

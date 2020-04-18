@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2019 The Tensor2Tensor Authors.
+# Copyright 2020 The Tensor2Tensor Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -34,6 +34,7 @@ from tensor2tensor.layers import common_layers
 from tensor2tensor.layers import modalities
 from tensor2tensor.layers.common_attention import mixed_precision_is_enabled
 from tensor2tensor.utils import beam_search
+from tensor2tensor.utils import contrib
 from tensor2tensor.utils import decoding
 from tensor2tensor.utils import expert_utils as eu
 from tensor2tensor.utils import hparams_lib
@@ -45,7 +46,7 @@ from tensor2tensor.utils import quantization
 from tensor2tensor.utils import registry
 from tensor2tensor.utils import scheduled_sampling
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 
 from tensorflow.python.layers import base
 from tensorflow.python.ops import inplace_ops
@@ -783,7 +784,7 @@ class T2TModel(base.Layer):
     Returns:
       A dict of decoding results {
           "outputs": integer `Tensor` of decoded ids of shape
-              [batch_size, <= decode_length] if beam_size == 1 or
+              [batch_size, <= decode_length] if top_beams == 1 or
               [batch_size, top_beams, <= decode_length]
           "scores": decoding log probs from the beam search,
               None if using greedy decoding (beam_size=1)
@@ -1350,13 +1351,14 @@ class T2TModel(base.Layer):
 
       def multinomial_squeeze(logits, temperature=1.0):
         logits_shape = common_layers.shape_list(logits)
-        reshaped_logits = (
-            tf.reshape(logits, [-1, logits_shape[-1]]) / temperature)
+        logits /= tf.reshape(temperature, [-1] + [1] * (len(logits_shape) - 1))
+        reshaped_logits = tf.reshape(logits, [-1, logits_shape[-1]])
         choices = tf.multinomial(reshaped_logits, 1)
         choices = tf.reshape(choices, logits_shape[:-1])
         return choices
 
-      samples = multinomial_squeeze(logits, self.hparams.sampling_temp)
+      temperature = features.get("sampling_temp", self.hparams.sampling_temp)
+      samples = multinomial_squeeze(logits, temperature)
 
     return samples, logits, losses
 
@@ -1578,7 +1580,7 @@ class T2TModel(base.Layer):
 
       remove_summaries()
 
-      return tf.contrib.tpu.TPUEstimatorSpec(
+      return contrib.tpu().TPUEstimatorSpec(
           tf.estimator.ModeKeys.TRAIN,
           loss=loss,
           train_op=train_op,
@@ -1635,7 +1637,7 @@ class T2TModel(base.Layer):
       )
 
       eval_metrics_fn_flat_args = _flatten_dict(eval_metrics_fn_args)
-      return tf.contrib.tpu.TPUEstimatorSpec(
+      return contrib.tpu().TPUEstimatorSpec(
           tf.estimator.ModeKeys.EVAL,
           eval_metrics=(eval_metrics_fn, eval_metrics_fn_flat_args),
           host_call=host_call,
@@ -1742,6 +1744,10 @@ class T2TModel(base.Layer):
     if "scores" in predictions:
       export_out["scores"] = predictions["scores"]
 
+    if decode_hparams.get("export_extra_infer_outputs"):
+      for output in decode_hparams.export_extra_infer_outputs.split(","):
+        export_out[output] = infer_out[output]
+
     # Necessary to rejoin examples in the correct order with the Cloud ML Engine
     # batch prediction API.
     if "batch_prediction_key" in predictions:
@@ -1760,7 +1766,7 @@ class T2TModel(base.Layer):
 
       remove_summaries()
 
-      return tf.contrib.tpu.TPUEstimatorSpec(
+      return contrib.tpu().TPUEstimatorSpec(
           tf.estimator.ModeKeys.PREDICT,
           predictions=predictions,
           host_call=host_call,
@@ -2171,19 +2177,19 @@ def create_host_call(model_dir):
       List of summary ops to run on the CPU host.
     """
     gs = tf.to_int64(kwargs.pop("global_step")[0])
-    with tf.contrib.summary.create_file_writer(model_dir).as_default():
-      with tf.contrib.summary.always_record_summaries():
+    with contrib.summary().create_file_writer(model_dir).as_default():
+      with contrib.summary().always_record_summaries():
         # We need to use tf.contrib.summary in order to feed the `step`.
         for name, value in sorted(six.iteritems(kwargs)):
           if name.startswith("ScalarSummary"):
             name = name[len("ScalarSummary"):]
-            tf.contrib.summary.scalar(
+            contrib.summary().scalar(
                 name, tf.reduce_mean(tf.to_float(value)), step=gs)
           elif name.startswith("ImageSummary"):
             name = name[len("ImageSummary"):]
-            tf.contrib.summary.image(name, value, step=gs)
+            contrib.summary().image(name, value, step=gs)
 
-        return tf.contrib.summary.all_summary_ops()
+        return contrib.summary().all_summary_ops()
 
   return (host_call_fn, summary_kwargs)
 
@@ -2332,9 +2338,9 @@ def initialize_from_ckpt(ckpt_dir, hparams):
     return
 
   tf.logging.info("Checkpoint dir: %s", ckpt_dir)
-  reader = tf.contrib.framework.load_checkpoint(ckpt_dir)
+  reader = contrib.framework().load_checkpoint(ckpt_dir)
   variable_map = {}
-  for var in tf.contrib.framework.get_trainable_variables():
+  for var in contrib.framework().get_trainable_variables():
     var_name = var.name.split(":")[0]
     if reader.has_tensor(var_name):
       tf.logging.info("Loading variable from checkpoint: %s", var_name)

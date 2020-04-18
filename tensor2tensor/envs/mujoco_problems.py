@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2019 The Tensor2Tensor Authors.
+# Copyright 2020 The Tensor2Tensor Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -41,6 +41,7 @@ class ReacherEnvProblem(rendered_env_problem.RenderedEnvProblem):
             "rendered_env_resize_to": None,  # Do not resize frames
             "sticky_actions": False,
             "output_dtype": None,
+            "num_actions": None,
         })
     super(ReacherEnvProblem, self).__init__(
         base_env_name=base_env_name, env_wrapper_fn=wrapper_fn)

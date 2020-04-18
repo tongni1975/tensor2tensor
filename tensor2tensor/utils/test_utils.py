@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2019 The Tensor2Tensor Authors.
+# Copyright 2020 The Tensor2Tensor Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 
 
 def run_in_graph_and_eager_modes(func=None,
@@ -39,7 +39,7 @@ def run_in_graph_and_eager_modes(func=None,
   For example, consider the following unittest:
 
   ```python
-  tf.compat.v1.enable_eager_execution()
+  tf.enable_eager_execution()
 
   class SomeTest(tf.test.TestCase):
 
@@ -120,5 +120,5 @@ def run_in_graph_mode_only(func=None, config=None, use_gpu=True):
 
 
 def test_main():
-  tf.compat.v1.enable_eager_execution()
+  tf.enable_eager_execution()
   tf.test.main()

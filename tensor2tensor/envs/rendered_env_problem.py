@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2019 The Tensor2Tensor Authors.
+# Copyright 2020 The Tensor2Tensor Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -24,7 +24,8 @@ import six
 from tensor2tensor.data_generators import video_utils
 from tensor2tensor.envs import env_problem
 from tensor2tensor.envs import gym_env_problem
-import tensorflow as tf
+from tensor2tensor.utils import contrib
+import tensorflow.compat.v1 as tf
 
 _IMAGE_ENCODED_FIELD = "image/encoded"
 _IMAGE_FORMAT_FIELD = "image/format"
@@ -58,16 +59,19 @@ class RenderedEnvProblem(gym_env_problem.GymEnvProblem,
   def initialize_environments(self,
                               batch_size=1,
                               parallelism=1,
+                              rendered_env=True,
                               per_env_kwargs=None,
                               **kwargs):
     gym_env_problem.GymEnvProblem.initialize_environments(
         self, batch_size=batch_size, parallelism=parallelism,
         per_env_kwargs=per_env_kwargs, **kwargs)
     # Assert the underlying gym environment has correct observation space
-    assert len(self.observation_spec.shape) == 3
+    if rendered_env:
+      assert len(self.observation_spec.shape) == 3
 
   def example_reading_spec(self):
     """Return a mix of env and video data fields and decoders."""
+    slim = contrib.slim()
     video_fields, video_decoders = (
         video_utils.VideoProblem.example_reading_spec(self))
     env_fields, env_decoders = (
@@ -79,9 +83,8 @@ class RenderedEnvProblem(gym_env_problem.GymEnvProblem,
 
     # Add frame number spec and decoder.
     env_fields[_FRAME_NUMBER_FIELD] = tf.FixedLenFeature((1,), tf.int64)
-    env_decoders[
-        _FRAME_NUMBER_FIELD] = tf.contrib.slim.tfexample_decoder.Tensor(
-            _FRAME_NUMBER_FIELD)
+    env_decoders[_FRAME_NUMBER_FIELD] = slim.tfexample_decoder.Tensor(
+        _FRAME_NUMBER_FIELD)
 
     # Add video fields and decoders
     env_fields.update(video_fields)

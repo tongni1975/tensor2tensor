@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2019 The Tensor2Tensor Authors.
+# Copyright 2020 The Tensor2Tensor Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,14 +21,16 @@ from __future__ import print_function
 import os
 from absl import flags
 import numpy as np
+from six.moves import zip
 from tensor2tensor.bin import t2t_trainer  # pylint: disable=unused-import
 from tensor2tensor.data_generators import image_utils
 from tensor2tensor.layers import common_layers
 from tensor2tensor.layers import common_video
 from tensor2tensor.models.research import glow_ops
+from tensor2tensor.utils import contrib
 from tensor2tensor.utils import decoding
 from tensor2tensor.utils import trainer_lib
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 
 # Flags placeholders.
 flags.DEFINE_string("checkpoint_path", None,
@@ -47,7 +49,7 @@ flags = tf.flags
 FLAGS = flags.FLAGS
 
 
-arg_scope = tf.contrib.framework.arg_scope
+arg_scope = contrib.framework().arg_scope
 
 
 def decode_hparams(overrides=""):

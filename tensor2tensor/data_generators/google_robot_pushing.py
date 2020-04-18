@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2019 The Tensor2Tensor Authors.
+# Copyright 2020 The Tensor2Tensor Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -35,7 +35,7 @@ from tensor2tensor.data_generators import video_utils
 from tensor2tensor.layers import modalities
 from tensor2tensor.utils import registry
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 
 BASE_URL = "https://storage.googleapis.com/brain-robotics-data/push/"
 DATA_TRAIN = (264, "push_train/push_train.tfrecord-{:05d}-of-00264")

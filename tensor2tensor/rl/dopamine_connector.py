@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2019 The Tensor2Tensor Authors.
+# Copyright 2020 The Tensor2Tensor Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -33,7 +33,7 @@ from dopamine.replay_memory.prioritized_replay_buffer import WrappedPrioritizedR
 import numpy as np
 
 from tensor2tensor.rl.policy_learner import PolicyLearner
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 
 # pylint: disable=g-import-not-at-top
 # pylint: disable=ungrouped-imports
